@@ -22,5 +22,8 @@
   "homepage": "https://github.com/AdenK2027/mac-audio-visualizer#readme",
   "devDependencies": {
     "vite": "^8.0.8"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2"
   }
 }

@@ -1,0 +1,26 @@
+{
+  "name": "mac-audio-visualizer",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AdenK2027/mac-audio-visualizer.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/AdenK2027/mac-audio-visualizer/issues"
+  },
+  "homepage": "https://github.com/AdenK2027/mac-audio-visualizer#readme",
+  "devDependencies": {
+    "vite": "^8.0.8"
+  }
+}

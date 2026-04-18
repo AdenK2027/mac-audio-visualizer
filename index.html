@@ -1,10 +1,47 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/addons/p5.sound.min.js"></script>
-  </head>
-  <body style="margin:0; padding:0; background:#141414;">
-    <script src="sketch.js"></script>
-  </body>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Waveform</title>
+  <link rel="stylesheet" href="index.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/addons/p5.sound.min.js"></script>
+</head>
+<body>
+
+  <div id="hud">
+    <span id="hud-paused" class="hidden">PAUSED — CLICK TO ENABLE AUDIO</span>
+  </div>
+
+  <div id="tab-bar">
+
+    <!-- Input tab -->
+    <div class="tab-group" id="group-input">
+      <button class="tab-btn" id="tab-input">
+        INPUT <span class="chevron">▲</span>
+      </button>
+      <div class="tray" id="tray-input">
+        <button class="tray-btn active" id="btn-mic">MIC</button>
+        <button class="tray-btn" id="btn-mp3">MP3 ↑</button>
+      </div>
+    </div>
+
+    <!-- Color tab -->
+    <div class="tab-group" id="group-color">
+      <button class="tab-btn" id="tab-color">
+        COLOR <span class="chevron">▲</span>
+      </button>
+      <div class="tray" id="tray-color">
+        <button class="tray-btn active" id="btn-bass">BASS</button>
+        <button class="tray-btn" id="btn-rainbow">RBW</button>
+      </div>
+    </div>
+
+  </div>
+
+  <input type="file" id="file-input" accept="audio/*" style="display:none">
+
+  <script src="sketch.js"></script>
+</body>
 </html>

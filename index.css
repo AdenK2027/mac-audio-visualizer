@@ -1,0 +1,149 @@
+/* ── Reset ── */
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* ── Body ── */
+body {
+  background: #000;
+  overflow: hidden;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+/* p5 puts its canvas inside a default div — make it fill */
+body > div:first-of-type {
+  position: fixed !important;
+  top: 0;
+  left: 0;
+  width: 100vw !important;
+  height: 100vh !important;
+}
+
+canvas {
+  display: block;
+  width: 100vw !important;
+  height: 100vh !important;
+}
+
+/* ── HUD ── */
+#hud {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: #fff;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  pointer-events: none;
+  z-index: 10;
+}
+
+#hud-paused {
+  color: #f87;
+}
+
+.hidden {
+  display: none;
+}
+
+/* ── Tab bar ── */
+#tab-bar {
+  position: fixed;
+  bottom: 0;
+  left: 24px;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  z-index: 10;
+}
+
+/* ── Tab group (tab button + tray stacked) ── */
+.tab-group {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 80px;
+}
+
+/* ── Tab button ── */
+.tab-btn {
+  height: 24px;
+  background: #1a1a1a;
+  color: #777;
+  border: none;
+  border-radius: 6px 6px 0 0;
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  transition: color 0.15s;
+}
+
+.tab-btn:hover {
+  color: #bbb;
+}
+
+.tab-btn .chevron {
+  font-size: 7px;
+  display: inline-block;
+  transition: transform 0.22s ease;
+}
+
+.tab-group.open .tab-btn .chevron {
+  transform: rotate(180deg);
+}
+
+/* ── Tray ── */
+.tray {
+  background: #1a1a1a;
+  border-radius: 0 6px 6px 6px;
+  overflow: hidden;
+  max-height: 0;
+  transition: max-height 0.22s ease, padding 0.22s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 8px;
+}
+
+.tab-group.open .tray {
+  max-height: 70px;
+  padding: 0 8px;
+  height: 70px;
+}
+
+/* ── Tray buttons ── */
+.tray-btn {
+  flex: 1;
+  height: 32px;
+  background: #111;
+  color: #666;
+  border: 1px solid #333;
+  border-radius: 5px;
+  font-family: inherit;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.tray-btn:hover {
+  background: #1f1f1f;
+  color: #aaa;
+  border-color: #555;
+}
+
+.tray-btn.active {
+  background: #1e3a28;
+  color: #fff;
+  border-color: #aaa;
+}

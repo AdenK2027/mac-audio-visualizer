@@ -7,12 +7,15 @@ function drawFireStyle() {
     let cx        = width / 2;
     let baseY     = height * 0.72;
     let flameMaxH = height * 0.55;
+
+    let logWidth = 420;
+    let logHeight = 240;
     
     // Log Rendering
     if (logsImg) {
         push();
         imageMode(CENTER);
-        image(logsImg, cx, baseY - 40, 380, 200);
+        image(logsImg, cx, baseY - 40, logWidth, logHeight);
         pop();
     }
 

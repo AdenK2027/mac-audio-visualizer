@@ -62,7 +62,7 @@ function draw() {
         }
 
         // 1. Define when planets start (0.4 = 40% into the warp)
-        const PLANET_START_THRESHOLD = 0.65;
+        const PLANET_START_THRESHOLD = 0.75;
         let planetStartTime = warpIntroStart + WARP_DURATION * PLANET_START_THRESHOLD;
         let timeSincePlanetStart = millis() - planetStartTime;
 
@@ -77,18 +77,16 @@ function draw() {
                 let adjustedTime = timeSincePlanetStart - p.growDelay;
                 if (adjustedTime <= 0) continue; 
 
-                // All planets must finish by the end of the TOTAL_GROW_WINDOW
                 let myGrowthDuration = TOTAL_GROW_WINDOW - p.growDelay;
-                
-                // Use constrain to ensure it never exceeds 1.0 even if math jitters
                 let planetScale = map(adjustedTime, 0, myGrowthDuration, 0.0, 1.0, true);
                 
+                // This now handles the center -> target move AND the size growth
                 p.display(planetScale);
             }
         } else if (timeSincePlanetStart > TOTAL_GROW_WINDOW) {
-            // Warp is over: show planets at full size
             for (let p of planets) {
                 p.update();
+                // Standard full-size display (or leaving logic if p.leaving is true)
                 p.display(1.0);
             }
         }
@@ -239,7 +237,6 @@ function initUI() {
                 .then(r => r.text())
                 .then(data => {
                     parsedLyrics = parseLRC(data);
-                    console.log("Lyrics paired successfully.");
                 })
                 .catch(err => console.log("LRC file not found in /songs"));
         });

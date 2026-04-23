@@ -17,7 +17,7 @@ class PooledPlanet {
             this.img = planetPool[0]; 
         }
 
-        let weight = pow(random(0, 1), 2);
+        let weight = pow(random(0, 1), 3);
         this.z = map(weight, 0, 1, 0.1, 5);
         this.size = map(this.z, 0.1, 5, 50, 500); 
         this.speed = map(this.z, 0.1, 5, 0.005, 0.2);
@@ -42,10 +42,28 @@ class PooledPlanet {
 
     display(scale = 1.0) {
         let s = this.leaving ? this.leaveScale : scale;
+
+        let cx = width / 2;
+        let cy = height / 2;
+        
+        let renderX, renderY;
+        
+        if (this.leaving) {
+            renderX = this.x;
+            renderY = this.y;
+        } else {
+            // Use lerp to move from center (0.0 scale) to target x,y (1.0 scale)
+            renderX = lerp(cx, this.x, scale);
+            renderY = lerp(cy, this.y, scale);
+        }
+
         push();
-        translate(this.x, this.y);
+        translate(renderX, renderY);
+        
         let d = this.size * s;
         imageMode(CENTER);
+        
+        // Draw your image using the calculated scale and aspect ratio
         image(this.img, 0, 0, d * this.aspect, d);
         pop();
     }

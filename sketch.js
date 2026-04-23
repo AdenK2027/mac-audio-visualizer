@@ -1,330 +1,348 @@
-let mic, fft, sound;
-let mode = 'mic';
-let rainbow = false;
-let rainbowSpeed = 10;
-let colorMode2 = 'intense';
-let pickedHue = 200;
-let bars = false;
-let slide = false;
-let soundLoaded = false;
-let smoothedWave = [];
-let slideBuffer = [];
-let lyricsStarted = false;
-let pg;
-let waveHistory = [];
-const HISTORY_LENGTH = 4;
-const SLIDE_LENGTH = 1024;
-let slideOffset = 0;
-let slideSpeed = 8;
-let surferImg;
-let surferY = 0;
-let surferAngle = 0;
+// sketch.js
 
+let planetPool = [];
+let availablePlanets = [];
+const TOTAL_PLANETS = 6;
 function preload() {
-    surferImg = loadImage('public/SpaceSurfer.png');
+    surferImg = loadImage('SpaceSurfer.png');
+    logsImg = loadImage('logs.png');
+    for (let i = 1; i <= TOTAL_PLANETS; i++) {
+        planetPool.push(loadImage(`planet${i}.png`));
+    }
 }
 
-// ── DOM refs ──
-const groupInput  = document.getElementById('group-input');
-const groupColor  = document.getElementById('group-color');
-const groupWave   = document.getElementById('group-wave');
-const groupSlide  = document.getElementById('group-slide');
-const tabInput    = document.getElementById('tab-input');
-const tabColor    = document.getElementById('tab-color');
-const tabWave     = document.getElementById('tab-wave');
-const tabSlide    = document.getElementById('tab-slide');
-const btnMic      = document.getElementById('btn-mic');
-const btnMp3      = document.getElementById('btn-mp3');
-const btnIntense  = document.getElementById('btn-intense');
-const btnRainbow  = document.getElementById('btn-rainbow');
-const btnNormal   = document.getElementById('btn-normal');
-const btnBars     = document.getElementById('btn-bars');
-const btnSlideOn  = document.getElementById('btn-slide-on');
-const btnSlideOff = document.getElementById('btn-slide-off');
-const fileInput   = document.getElementById('file-input');
-const hudMode     = document.getElementById('hud-mode');
-const hudPaused   = document.getElementById('hud-paused');
-const btnSuper  = document.getElementById('btn-super');
-const colorPicker = document.getElementById('color-picker');
-
-// ── Tab toggles ──
-tabInput.addEventListener('click', () => groupInput.classList.toggle('open'));
-tabColor.addEventListener('click', () => groupColor.classList.toggle('open'));
-tabWave.addEventListener('click', () => groupWave.classList.toggle('open'));
-tabSlide.addEventListener('click', () => groupSlide.classList.toggle('open'));
-
-// ── Input buttons ──
-btnMic.addEventListener('click', switchToMic);
-
-btnMp3.addEventListener('click', () => {
-    if (!soundLoaded) {
-        fileInput.click();
-    } else {
-        switchToMP3();
-    }
-});
-
-fileInput.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const url = URL.createObjectURL(file);
-    if (sound) sound.stop();
-    soundLoaded = false;
-    sound = loadSound(url, () => {
-        soundLoaded = true;
-        btnMp3.textContent = 'MP3';
-        fft.setInput(sound);
-        switchToMP3();
-        userStartAudio().then(() => { sound.play(); });
-    });
-});
-
-// ── Color buttons ──
-btnIntense.addEventListener('click', () => {
-    colorMode2 = 'intense';
-    rainbow = false;
-    btnIntense.classList.add('active');
-    btnRainbow.classList.remove('active');
-    btnSuper.classList.remove('active');
-});
-
-btnRainbow.addEventListener('click', () => {
-    colorMode2 = 'rainbow';
-    rainbow = true;
-    btnRainbow.classList.add('active');
-    btnIntense.classList.remove('active');
-    btnSuper.classList.remove('active');
-});
-
-btnSuper.addEventListener('click', () => {
-    colorMode2 = 'super';
-    btnSuper.classList.add('active');
-    btnIntense.classList.remove('active');
-    btnRainbow.classList.remove('active');
-});
-
-colorPicker.addEventListener('input', (e) => {
-    colorMode2 = 'pick';
-    btnIntense.classList.remove('active');
-    btnRainbow.classList.remove('active');
-    btnSuper.classList.remove('active');
-    // Convert hex to HSB hue
-    let c = color(e.target.value);
+function setup() {
+    createCanvas(windowWidth, windowHeight);
     colorMode(HSB, 360, 100, 100, 100);
-    pickedHue = hue(c);
-});
 
-// ── Wave buttons ──
-btnNormal.addEventListener('click', () => {
-    bars = false;
+    mic = new p5.AudioIn();
+
+    //adjust smoothing, bins
+    fft = new p5.FFT(0.98, 1024);
+    fftFire = new p5.FFT(0.1, 1024);
+
+    mic.start();
+    fft.setInput(mic);
+    fftFire.setInput(mic);
+
+    flameHeight = new Array(FIRE_COLS).fill(0);
+    flameTarget = new Array(FIRE_COLS).fill(0);
+
+    // Initialize DOM elements and button listeners
+    initUI(); 
+    
+    if (getAudioContext().state !== 'running') {
+        hudPaused.classList.remove('hidden');
+    }
+
+    availablePlanets = [...planetPool];
+    planets = []; 
+    let planetCount = min(8, availablePlanets.length);
+    for (let i = 0; i < planetCount; i++) {
+        planets.push(new PooledPlanet());
+    }
+
+    stars = []
+    for (let i = 0; i < 40; i++) {
+        stars.push(new Star());
+    }
+}
+
+function draw() {
+    background(240, 80, 10);
+    if (backMode === 'space') {
+        for (let s of stars) {
+            s.update();
+            s.display();
+        }
+        for (let p of planets) {
+            p.update();
+            p.display();
+        }
+    }
+
+    // ── LYRIC SYNC ENGINE ──
+    if (mode === 'mp3' && sound && sound.isPlaying()) {
+        // Get the full object from lrc-parser.js
+        let lyricObj = getCurrentLyricLine(sound.currentTime());
+        if (lyricObj) {
+            showLine(lyricObj); // Pass the whole object
+        }
+    }
+
+    //grabbing sound data
+    let waveform = fft.waveform();
+    let spectrumNormal = fft.analyze();
+    let spectrumFast = fftFire.analyze();
+
+    currentIntensity = fft.getEnergy("mid") / 255;
+    let ampScale = (mode === 'mp3' ? 0.25 : 1.0)*4;
+
+    if (smoothedWave.length === 0) smoothedWave = new Array(waveform.length).fill(0);
+    let totalAmplitude = 0;
+    for (let i = 0; i < waveform.length; i++) {
+        smoothedWave[i] = lerp(smoothedWave[i], waveform[i], slide ? 0.03 : 0.08);
+        totalAmplitude += abs(waveform[i]);
+    }
+    let avgAmplitude = totalAmplitude / waveform.length;
+
+    let currentHue = calculateHue(avgAmplitude);
+
+    // Rendering from modular files (fire.js / waves.js)
+    if (slide) {
+        drawSlide(waveform, currentHue, ampScale);
+    } else if (split) {
+        drawSplitStyle(spectrumFast, currentHue, ampScale);
+    } else if (fire) {
+        waveHistory = [];
+        drawFireStyle(); 
+    } else if (trails) {
+        handleTrails(currentHue, ampScale);
+    } else {
+        waveHistory = [];
+        if (bars) drawBarsStyle([...smoothedWave], 100, currentHue, ampScale);
+        else      drawSineStyle([...smoothedWave], 100, currentHue, ampScale);
+    }
+
+    drawLyrics();
+    updatePlaybackUI();
+    initTabsToggle();
+}
+
+function calculateHue(avg) {
+    if (colorMode2 === 'rainbow') return (millis() / rainbowSpeed) % 360;
+    if (colorMode2 === 'super')   return map(avg, 0, 0.15, 0, 360);
+    if (colorMode2 === 'pick')    return pickedHue;
+    return map(avg, 0, 0.3, 100, 360);
+}
+
+function handleTrails(currentHue, ampScale) {
+    waveHistory.push({ data: [...smoothedWave], hue: currentHue });
+    if (waveHistory.length > HISTORY_LENGTH) waveHistory.shift();
+    for (let h = 0; h < waveHistory.length; h++) {
+        let alpha = map(h, 0, waveHistory.length - 1, 25, 100);
+        if (bars) drawBarsStyle(waveHistory[h].data, alpha, waveHistory[h].hue, ampScale);
+        else      drawSineStyle(waveHistory[h].data, alpha, waveHistory[h].hue, ampScale);
+    }
+}
+
+// ── UI Initialization ──
+function initUI() {
+    // 1. Link the variables in constants.js to actual HTML elements
+    groupInput   = document.getElementById('group-input');
+    groupColor   = document.getElementById('group-color');
+    groupWave    = document.getElementById('group-wave');
+    groupSlide   = document.getElementById('group-slide');
+    groupTrail   = document.getElementById('group-trail');
+    groupBack = document.getElementById('group-back');
+    tabInput     = document.getElementById('tab-input');
+    tabColor     = document.getElementById('tab-color');
+    tabWave      = document.getElementById('tab-wave');
+    tabSlide     = document.getElementById('tab-slide');
+    tabTrail     = document.getElementById('tab-trail');
+    tabBack = document.getElementById('tab-back');
+    btnMic       = document.getElementById('btn-mic');
+    btnMp3       = document.getElementById('btn-mp3');
+    btnIntense   = document.getElementById('btn-intense');
+    btnRainbow   = document.getElementById('btn-rainbow');
+    btnNormal    = document.getElementById('btn-normal');
+    btnBars      = document.getElementById('btn-bars');
+    btnFire      = document.getElementById('btn-fire');
+    btnSlideOn   = document.getElementById('btn-slide-on');
+    btnSlideOff  = document.getElementById('btn-slide-off');
+    btnTrails    = document.getElementById('btn-trails');
+    btnTrailsOff = document.getElementById('btn-no-trails');
+    btnSuper     = document.getElementById('btn-super');
+    colorPicker  = document.getElementById('color-picker');
+    fileInput    = document.getElementById('file-input');
+    hudPaused    = document.getElementById('hud-paused');
+    btnPrev      = document.getElementById('btn-prev');
+    btnPause     = document.getElementById('btn-pause');
+    btnNext      = document.getElementById('btn-next');
+    btnSplit = document.getElementById('btn-split');
+    btnDefault = document.getElementById('btn-default');
+    btnSpace = document.getElementById('btn-space');
+
+    // 2. Add Event Listeners
+    tabInput.addEventListener('click',  () => groupInput.classList.toggle('open'));
+    tabColor.addEventListener('click',  () => groupColor.classList.toggle('open'));
+    tabWave.addEventListener('click',   () => groupWave.classList.toggle('open'));
+    tabSlide.addEventListener('click',  () => groupSlide.classList.toggle('open'));
+    tabTrail.addEventListener('click',  () => groupTrail.classList.toggle('open'));
+    tabBack.addEventListener('click', () => groupBack.classList.toggle('open'));
+
+    btnMic.addEventListener('click', switchToMic);
+    btnMp3.addEventListener('click', () => { if (!soundLoaded) fileInput.click(); else switchToMP3(); });
+
+    fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const url = URL.createObjectURL(file);
+        if (sound) sound.stop();
+        soundLoaded = false;
+
+        sound = loadSound(url, () => {
+            soundLoaded = true;
+            btnMp3.textContent = 'MP3';
+            fft.setInput(sound);
+            fftFire.setInput(sound);
+            switchToMP3();
+
+            // AUTO-LOAD MATCHING LRC
+            let lrcName = file.name.split('.').slice(0, -1).join('.') + '.lrc';
+            fetch(`songs/${lrcName}`)
+                .then(r => r.text())
+                .then(data => {
+                    parsedLyrics = parseLRC(data);
+                    console.log("Lyrics paired successfully.");
+                })
+                .catch(err => console.log("LRC file not found in /songs"));
+        });
+    });
+
+    btnIntense.addEventListener('click', () => setColorMode('intense'));
+    btnRainbow.addEventListener('click', () => setColorMode('rainbow'));
+    btnSuper.addEventListener('click',   () => setColorMode('super'));
+    
+    colorPicker.addEventListener('input', (e) => {
+        colorMode2 = 'pick';
+        btnIntense.classList.remove('active');
+        btnRainbow.classList.remove('active');
+        btnSuper.classList.remove('active');
+        let c = color(e.target.value);
+        colorMode(HSB, 360, 100, 100, 100);
+        pickedHue = hue(c);
+    });
+
+    btnNormal.addEventListener('click', () => setWaveMode('normal'));
+    btnBars.addEventListener('click',   () => setWaveMode('bars'));
+    btnFire.addEventListener('click',   () => setWaveMode('fire'));
+    btnSplit.addEventListener('click', () => setWaveMode('split'));
+
+
+    btnSlideOn.addEventListener('click', () => {
+        slide = true; btnSlideOn.classList.add('active'); btnSlideOff.classList.remove('active');
+    });
+    btnSlideOff.addEventListener('click', () => {
+        slide = false; btnSlideOff.classList.add('active'); btnSlideOn.classList.remove('active');
+    });
+
+    btnTrails.addEventListener('click', () => {
+        trails = true; btnTrails.classList.add('active'); btnTrailsOff.classList.remove('active');
+    });
+    btnTrailsOff.addEventListener('click', () => {
+        trails = false; btnTrailsOff.classList.add('active'); btnTrails.classList.remove('active');
+    });
+
+    btnPrev.addEventListener('click', () => {
+        if (sound && sound.isPlaying()) sound.jump(max(0, sound.currentTime() - 5));
+    });
+    btnPause.addEventListener('click', () => {
+        if (!sound) return;
+        if (sound.isPlaying()) { sound.pause(); btnPause.textContent = 'Play'; }
+        else { sound.play(); btnPause.textContent = 'Pause'; }
+    });
+    btnNext.addEventListener('click', () => {
+        if (sound && sound.isPlaying()) sound.jump(min(sound.duration(), sound.currentTime() + 5));
+    });
+
+    btnDefault.addEventListener('click', () => {
+        backMode = 'default';
+        btnDefault.classList.add('active');
+        btnSpace.classList.remove('active');
+    });
+
+    btnSpace.addEventListener('click', () => {
+        backMode = 'space';
+        btnSpace.classList.add('active');
+        btnDefault.classList.remove('active');
+    });
+}
+
+// ── Shared Audio/Visual Setters ──
+function setColorMode(m) {
+    colorMode2 = m;
+    rainbow = (m === 'rainbow');
+    btnIntense.classList.toggle('active', m === 'intense');
+    btnRainbow.classList.toggle('active', m === 'rainbow');
+    btnSuper.classList.toggle('active',   m === 'super');
+}
+
+function setWaveMode(m) {
+    bars = (m === 'bars');
+    fire = (m === 'fire');
+    split = (m === 'split');
+    if (!fire) { flameHeight = new Array(FIRE_COLS).fill(0); emberList = []; }
     waveHistory = [];
-    btnNormal.classList.add('active');
-    btnBars.classList.remove('active');
-});
+    btnNormal.classList.toggle('active', m === 'normal');
+    btnBars.classList.toggle('active',   m === 'bars');
+    btnFire.classList.toggle('active',   m === 'fire');
+    btnSplit.classList.toggle('active', m === 'split');
+}
 
-btnBars.addEventListener('click', () => {
-    bars = true;
-    btnBars.classList.add('active');
-    btnNormal.classList.remove('active');
-});
-
-// ── Slide buttons ──
-btnSlideOn.addEventListener('click', () => {
-    slide = true;
-    slideBuffer = [];
-    btnSlideOn.classList.add('active');
-    btnSlideOff.classList.remove('active');
-});
-
-btnSlideOff.addEventListener('click', () => {
-    slide = false;
-    slideBuffer = [];
-    btnSlideOff.classList.add('active');
-    btnSlideOn.classList.remove('active');
-});
-
-// ── Audio switching ──
 function switchToMic() {
     mode = 'mic';
     if (sound && sound.isPlaying()) sound.stop();
     mic.start();
     fft.setInput(mic);
+    fftFire.setInput(mic);
     btnMic.classList.add('active');
     btnMp3.classList.remove('active');
-    hudMode.textContent = 'MODE: MICROPHONE';
-    if (!lyricsStarted) {
-        startAssemblyAI((text) => showLine(text));
-        lyricsStarted = true;
-    }
 }
 
 function switchToMP3() {
     mode = 'mp3';
-    if (mic) mic.stop();
+    mic.stop();
     if (sound) {
         fft.setInput(sound);
-        if (!sound.isPlaying()) sound.play();
+        fftFire.setInput(sound);
+        if (!sound.isPlaying() && !sound.isPaused()) sound.play();
     }
     btnMp3.classList.add('active');
     btnMic.classList.remove('active');
-    hudMode.textContent = 'MODE: MP3';
-    stopAssemblyAI();
-    lyricsStarted = false;
 }
 
-// ── p5 sketch ──
-function setup() {
-    createCanvas(windowWidth, windowHeight);
-    colorMode(HSB, 360, 100, 100, 100);
-
-    pg = createGraphics(windowWidth, windowHeight);
-    pg.colorMode(HSB, 360, 100, 100, 100);
-    pg.clear();
-
-    mic = new p5.AudioIn();
-    fft = new p5.FFT(0.98, 1024);
-    mic.start();
-    fft.setInput(mic);
-
-    if (getAudioContext().state !== 'running') {
-        hudPaused.classList.remove('hidden');
+function updatePlaybackUI() {
+    const controls = document.getElementById('controls');
+    if (controls) {
+        controls.classList.toggle('visible', mode === 'mp3' && mouseX < 250 && mouseY < 80);
     }
-    startAssemblyAI((text) => showLine(text));
-    lyricsStarted = true;
+
+    const showTabs = document.getElementById('show-tabs');
+    if (showTabs) {
+        const mouseInRightZone = (mouseX > width - 120 && mouseY < 40);
+        showTabs.classList.toggle('visible', mouseInRightZone);
+    }
 }
 
-function draw() {
-    background(240, 80, 10);
+function initTabsToggle() {
+    const showTabsBtn = document.getElementById('show-tabs-btn');
+    const tabBar = document.getElementById('tab-bar');
 
-    let waveform = fft.waveform();
-    let intensity = fft.getEnergy("mid");
-    let ampScale = (mode === 'mp3' ? 0.55 : 1.0) * 6;
-
-    if (smoothedWave.length === 0) smoothedWave = new Array(waveform.length).fill(0);
-    for (let i = 0; i < waveform.length; i++) {
-        smoothedWave[i] = lerp(smoothedWave[i], waveform[i], slide ? 0.03 : 0.08);
-    }
-
-    let currentHue;
-    if (colorMode2 === 'rainbow') {
-        currentHue = (millis() / rainbowSpeed) % 360;
-    } else if (colorMode2 === 'super') {
-        let totalAmplitude = 0;
-        for (let i = 0; i < waveform.length; i++) totalAmplitude += abs(waveform[i]);
-        let average = totalAmplitude / waveform.length;
-        currentHue = map(average, 0, 0.1, 0, 360);
-        console.log(currentHue);
-    } else if (colorMode2 === 'pick') {
-        currentHue = pickedHue;
-    } else {
-        // intense — original behavior
-        let totalAmplitude = 0;
-        for (let i = 0; i < waveform.length; i++) totalAmplitude += abs(waveform[i]);
-        let average = totalAmplitude / waveform.length;
-        currentHue = map(average, 0, 0.2, 100, 300);
-        console.log(currentHue);
-    }
-
-    if (slide) {
-        drawSlide(waveform, currentHue, ampScale);
-    } else {
-        waveHistory.push({
-            data: [...smoothedWave],
-            hue: currentHue,
-            bright: map(intensity, 0, 255, 40, 100)
-        });
-        if (waveHistory.length > HISTORY_LENGTH) waveHistory.shift();
-
-        for (let h = 0; h < waveHistory.length; h++) {
-            let alpha = pow(map(h, 0, waveHistory.length - 1, 0, 1), 2) * 100;
-            if (bars) {
-                drawBarsStyle(waveHistory[h].data, alpha, waveHistory[h].hue, ampScale);
+    if (showTabsBtn && tabBar) {
+        showTabsBtn.addEventListener('click', () => {
+            tabBar.classList.toggle('hidden');
+            if (tabBar.classList.contains('hidden')) {
+                showTabsBtn.textContent = 'Show Tabs';
             } else {
-                drawSineStyle(waveHistory[h].data, alpha, waveHistory[h].hue, ampScale);
+                showTabsBtn.textContent = 'Hide Tabs';
             }
-        }
-    }
-
-    drawLyrics();
-    drawAssemblyIndicator();
-}
-
-function drawSlide(waveform, hueValue, ampScale) {
-    slideOffset = (slideOffset + slideSpeed) % smoothedWave.length;
-
-    stroke(hueValue, 80, 100);
-    strokeWeight(7);
-    noFill();
-
-    let centerIdx = (Math.floor(smoothedWave.length / 2) + slideOffset) % smoothedWave.length;
-    let rawY = map(smoothedWave[centerIdx] * ampScale, -1, 1, 0, height);
-
-    let prevIdx = (Math.floor(smoothedWave.length / 2) + slideOffset - 4 + smoothedWave.length) % smoothedWave.length;
-    let nextIdx = (Math.floor(smoothedWave.length / 2) + slideOffset + 4) % smoothedWave.length;
-    let prevY = map(smoothedWave[prevIdx] * ampScale, -1, 1, 0, height);
-    let nextY = map(smoothedWave[nextIdx] * ampScale, -1, 1, 0, height);
-    let rawAngle = atan2(nextY - prevY, width / smoothedWave.length * 8);
-
-    // Smooth position and angle independently — higher lerp = more responsive, lower = floatier
-    surferY = lerp(surferY, rawY, 0.1);
-    surferAngle = lerp(surferAngle, rawAngle, 0.1);
-
-    beginShape();
-    curveVertex(0, map(smoothedWave[slideOffset % smoothedWave.length] * ampScale, -1, 1, 0, height));
-    for (let i = 0; i < smoothedWave.length; i += 10) {
-        let idx = (i + slideOffset) % smoothedWave.length;
-        let x = map(i, 0, smoothedWave.length, 0, width);
-        let y = map(smoothedWave[idx] * ampScale, -1, 1, 0, height);
-        curveVertex(x, y);
-    }
-    curveVertex(width, map(smoothedWave[(slideOffset + smoothedWave.length - 1) % smoothedWave.length] * ampScale, -1, 1, 0, height));
-    endShape();
-
-    if (surferImg) {
-        let surferW = 250;
-        let surferH = 250;
-        push();
-        translate(width / 2, surferY - surferH / 2);
-        rotate(surferAngle);
-        imageMode(CENTER);
-        image(surferImg, 0, 0, surferW, surferH);
-        pop();
-    }
-}
-
-function drawSineStyle(wave, alpha, hueValue, ampScale) {
-    stroke(hueValue, 80, 100, alpha);
-    strokeWeight(7);
-    noFill();
-    beginShape();
-    curveVertex(0, map(wave[0] * ampScale, -1, 1, 0, height));
-    for (let i = 0; i < wave.length; i += 10) {
-        let x = map(i, 0, wave.length, 0, width);
-        let y = map(wave[i] * ampScale, -1, 1, 0, height);
-        curveVertex(x, y);
-    }
-    curveVertex(width, map(wave[wave.length - 1] * ampScale, -1, 1, 0, height));
-    endShape();
-}
-
-function drawBarsStyle(wave, alpha, hueValue, ampScale) {
-    stroke(hueValue, 80, 100, alpha);
-    strokeWeight(4);
-    for (let i = 0; i < wave.length; i += 20) {
-        let x = map(i, 0, wave.length, 0, width);
-        let h = map(wave[i] * ampScale, -1, 1, 0, height);
-        line(x, height / 2, x, h);
+        });
     }
 }
 
 function mousePressed() {
     if (getAudioContext().state !== 'running') {
-        getAudioContext().resume().then(() => {
-            hudPaused.classList.add('hidden');
-        });
+        getAudioContext().resume().then(() => hudPaused.classList.add('hidden'));
     }
 }
 
-function windowResized() {
-    resizeCanvas(windowWidth, windowHeight);
+function keyPressed() {
+  if (key === 'f' || key === 'F') {
+    let fs = fullscreen();
+    fullscreen(!fs);
+  }
 }
+
+function windowResized() { resizeCanvas(windowWidth, windowHeight); }

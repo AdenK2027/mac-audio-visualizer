@@ -2,6 +2,7 @@
 
 let planetPool = [];
 let availablePlanets = [];
+let leavingPlanets = [];
 const TOTAL_PLANETS = 6;
 function preload() {
     surferImg = loadImage('SpaceSurfer.png');
@@ -50,16 +51,58 @@ function setup() {
 
 function draw() {
     background(240, 80, 10);
+    drawWarp();
     if (backMode === 'space') {
-        for (let s of stars) {
-            s.update();
-            s.display();
-        }
-        for (let p of planets) {
+        for (let s of stars) { s.update(); s.display(); }
+
+        leavingPlanets = leavingPlanets.filter(p => p.leaveScale > 0.02);
+        for (let p of leavingPlanets) {
             p.update();
             p.display();
         }
+
+        // 1. Define when planets start (0.4 = 40% into the warp)
+        const PLANET_START_THRESHOLD = 0.65;
+        let planetStartTime = warpIntroStart + WARP_DURATION * PLANET_START_THRESHOLD;
+        let timeSincePlanetStart = millis() - planetStartTime;
+
+        // 2. The window is exactly the remaining 60% of the warp duration
+        const TOTAL_GROW_WINDOW = WARP_DURATION * (1 - PLANET_START_THRESHOLD); 
+
+        if (timeSincePlanetStart > 0 && timeSincePlanetStart <= TOTAL_GROW_WINDOW) {
+            planets.sort((a, b) => a.z - b.z);
+            for (let p of planets) {
+                p.update();
+                
+                let adjustedTime = timeSincePlanetStart - p.growDelay;
+                if (adjustedTime <= 0) continue; 
+
+                // All planets must finish by the end of the TOTAL_GROW_WINDOW
+                let myGrowthDuration = TOTAL_GROW_WINDOW - p.growDelay;
+                
+                // Use constrain to ensure it never exceeds 1.0 even if math jitters
+                let planetScale = map(adjustedTime, 0, myGrowthDuration, 0.0, 1.0, true);
+                
+                p.display(planetScale);
+            }
+        } else if (timeSincePlanetStart > TOTAL_GROW_WINDOW) {
+            // Warp is over: show planets at full size
+            for (let p of planets) {
+                p.update();
+                p.display(1.0);
+            }
+        }
     }
+
+    leavingPlanets = leavingPlanets.filter(p => {
+        let d = p.size * p.leaveScale;
+        let halfW = (d * p.aspect) / 2;
+        let halfH = d / 2;
+        return p.x + halfW > 0 &&
+            p.x - halfW < width &&
+            p.y + halfH > 0 &&
+            p.y - halfH < height;
+    });
 
     // ── LYRIC SYNC ENGINE ──
     if (mode === 'mp3' && sound && sound.isPlaying()) {
@@ -84,7 +127,7 @@ function draw() {
         smoothedWave[i] = lerp(smoothedWave[i], waveform[i], slide ? 0.03 : 0.08);
         totalAmplitude += abs(waveform[i]);
     }
-    let avgAmplitude = totalAmplitude / waveform.length;
+    avgAmplitude = totalAmplitude / waveform.length;
 
     let currentHue = calculateHue(avgAmplitude);
 
@@ -162,6 +205,7 @@ function initUI() {
     btnSplit = document.getElementById('btn-split');
     btnDefault = document.getElementById('btn-default');
     btnSpace = document.getElementById('btn-space');
+    btnWarp = document.getElementById('btn-warp');
 
     // 2. Add Event Listeners
     tabInput.addEventListener('click',  () => groupInput.classList.toggle('open'));
@@ -249,14 +293,45 @@ function initUI() {
 
     btnDefault.addEventListener('click', () => {
         backMode = 'default';
+        stopWarp();
         btnDefault.classList.add('active');
         btnSpace.classList.remove('active');
+        btnWarp.classList.remove('active');
     });
 
     btnSpace.addEventListener('click', () => {
+        const wasSpace = backMode === 'space';
         backMode = 'space';
         btnSpace.classList.add('active');
         btnDefault.classList.remove('active');
+        btnWarp.classList.remove('active');
+        startWarpIntro();
+
+        if (wasSpace) {
+            for (let p of planets) {
+                p.startLeaving();
+                leavingPlanets.push(p);
+            }
+        }
+
+        availablePlanets = [...planetPool];
+        planets = [];
+        let planetCount = min(8, availablePlanets.length);
+        for (let i = 0; i < planetCount; i++) {
+            planets.push(new PooledPlanet());
+        }
+        stars = [];
+        for (let i = 0; i < floor(random(40, 80)); i++) {
+            stars.push(new Star());
+        }
+    });
+
+    btnWarp.addEventListener('click', () => {
+        backMode = 'warp';
+        btnWarp.classList.add('active');
+        btnDefault.classList.remove('active');
+        btnSpace.classList.remove('active');
+        startWarp();
     });
 }
 
@@ -339,10 +414,13 @@ function mousePressed() {
 }
 
 function keyPressed() {
-  if (key === 'f' || key === 'F') {
-    let fs = fullscreen();
-    fullscreen(!fs);
-  }
+    if (key === 'f' || key === 'F') {
+        let fs = fullscreen();
+        fullscreen(!fs);
+    }
+    if (key === ' ') {
+        btnSpace.click();
+    }
 }
 
 function windowResized() { resizeCanvas(windowWidth, windowHeight); }

@@ -21,7 +21,7 @@ canvas {
   width: 100vw !important;
   height: 100vh !important;
   display: block;
-  z-index: 0;
+  z-index: 2;
 }
 
 /* ── HUD ── */
@@ -209,4 +209,15 @@ canvas {
 
 #show-tabs-btn {
     cursor: pointer;
+}
+
+#warp-gif {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    object-fit: cover; /* Ensures it fills the screen without stretching */
+    z-index: 9999;    /* Above everything else */
+    pointer-events: none; /* So you can't accidentally click the image */
 }

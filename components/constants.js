@@ -21,6 +21,8 @@ let currentIntensity = 0;
 let split = false;
 let backMode = 'default';
 let planets = [];
+let avgAmplitude = 1;
+let warpMode = 'off';  // 'off' | 'intro' | 'continuous'
 
 // ── Fire State ──
 let flameHeight = [], flameTarget = [], emberList = [];
@@ -32,4 +34,4 @@ let btnMic, btnMp3, btnIntense, btnRainbow, btnNormal, btnBars, btnFire;
 let btnSlideOn, btnSlideOff, btnTrails, btnTrailsOff, btnSuper;
 let colorPicker, fileInput, hudPaused;
 let btnPrev, btnPause, btnNext;
-let btnDefault, btnSpace;
+let btnDefault, btnSpace, btnWarp;

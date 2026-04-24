@@ -34,4 +34,4 @@ let btnMic, btnMp3, btnIntense, btnRainbow, btnNormal, btnBars, btnFire;
 let btnSlideOn, btnSlideOff, btnTrails, btnTrailsOff, btnSuper;
 let colorPicker, fileInput, hudPaused;
 let btnPrev, btnPause, btnNext;
-let btnDefault, btnSpace, btnWarp;
+let btnDefault, btnSpace, btnWarp, btnOcean, btnForest;

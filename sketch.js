@@ -3,14 +3,25 @@
 let planetPool = [];
 let availablePlanets = [];
 let leavingPlanets = [];
+let stormImg;
+let forestImg;
+
 const TOTAL_PLANETS = 6;
 function preload() {
     surferImg = loadImage('SpaceSurfer.png');
     logsImg = loadImage('logs.png');
     for (let i = 1; i <= TOTAL_PLANETS; i++) {
-        planetPool.push(loadImage(`planet${i}.png`));
+        img = loadImage(`planet${i}.png`)
+        if (i === 1) img.planetType = 'dust';
+        if (i === 5) img.planetType = 'flat';
+        planetPool.push(img);
     }
+    stormImg = loadImage('planet1storm.png');
+    forestImg = loadImage('forestBackground.png');
 }
+
+let particles = [];
+let shafts = [];
 
 function setup() {
     createCanvas(windowWidth, windowHeight);
@@ -20,7 +31,7 @@ function setup() {
 
     //adjust smoothing, bins
     fft = new p5.FFT(0.98, 1024);
-    fftFire = new p5.FFT(0.1, 1024);
+    fftFire = new p5.FFT(0.8, 1024);
 
     mic.start();
     fft.setInput(mic);
@@ -50,8 +61,14 @@ function setup() {
 }
 
 function draw() {
-    background(240, 80, 10);
-    drawWarp();
+    if (backMode === 'ocean') {
+        drawUnderwaterBackground();
+        for (let s of shafts) s.display();
+    } else {
+        background(240, 80, 10);
+        drawWarp();
+    }
+
     if (backMode === 'space') {
         for (let s of stars) { s.update(); s.display(); }
 
@@ -90,6 +107,13 @@ function draw() {
                 p.display(1.0);
             }
         }
+    } else if (backMode === 'ocean') {
+        drawOceanScene();
+    } else if (backMode === 'forest') {
+        drawForestBackground();
+    } else {
+        background(240, 80, 10);
+        drawWarp();
     }
 
     leavingPlanets = leavingPlanets.filter(p => {
@@ -204,6 +228,8 @@ function initUI() {
     btnDefault = document.getElementById('btn-default');
     btnSpace = document.getElementById('btn-space');
     btnWarp = document.getElementById('btn-warp');
+    btnOcean = document.getElementById('btn-ocean');
+    btnForest = document.getElementById('btn-forest');
 
     // 2. Add Event Listeners
     tabInput.addEventListener('click',  () => groupInput.classList.toggle('open'));
@@ -294,6 +320,8 @@ function initUI() {
         btnDefault.classList.add('active');
         btnSpace.classList.remove('active');
         btnWarp.classList.remove('active');
+        btnOcean.classList.remove('active');
+        btnForest.classList.remove('active');
     });
 
     btnSpace.addEventListener('click', () => {
@@ -302,6 +330,8 @@ function initUI() {
         btnSpace.classList.add('active');
         btnDefault.classList.remove('active');
         btnWarp.classList.remove('active');
+        btnOcean.classList.remove('active');
+        btnForest.classList.remove('active');
         startWarpIntro();
 
         if (wasSpace) {
@@ -328,7 +358,39 @@ function initUI() {
         btnWarp.classList.add('active');
         btnDefault.classList.remove('active');
         btnSpace.classList.remove('active');
+        btnOcean.classList.remove('active');
+        btnForest.classList.remove('active');
         startWarp();
+    });
+
+
+    btnOcean.addEventListener('click', () => {
+        backMode = 'ocean';
+        stopWarp();
+        
+        // UI state management
+        btnOcean.classList.add('active');
+        btnDefault.classList.remove('active');
+        btnSpace.classList.remove('active');
+        btnWarp.classList.remove('active');
+        btnForest.classList.remove('active');
+        
+        initOcean();
+        syncOceanLegacyRefs();
+    });
+
+    btnForest.addEventListener('click', () => {
+        backMode = 'forest';
+        stopWarp();
+        
+        // UI state management
+        btnForest.classList.add('active');
+        btnDefault.classList.remove('active');
+        btnSpace.classList.remove('active');
+        btnWarp.classList.remove('active');
+        btnOcean.classList.remove('active');
+        
+        initForest();
     });
 }
 
